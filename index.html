@@ -4,117 +4,89 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Google Tasks Embed</title>
-  <!-- Include Google Sign-In and API Libraries -->
-  <script src="https://apis.google.com/js/platform.js" async defer></script>
-  <script src="https://apis.google.com/js/api.js" async defer></script>
-  <!-- Add your API key and Client ID -->
-  <script>
-    const API_KEY = 'AIzaSyCrcMI3IL1SHdDAksbtQVEuTZBIjHhCKOI';
-    const CLIENT_ID = '469907870120-iecguv6bovdlicjaqtiq8044hl1mkl3j.apps.googleusercontent.com';
-  </script>
 </head>
 <body>
   <!-- Google Sign-In button -->
   <div class="g-signin2" data-onsuccess="onSignIn"></div>
 
-  <!-- Dropdown for Task Lists -->
-  <label for="taskLists">Select Task List:</label>
-  <select id="taskLists" onchange="fetchTasks()">
+  <!-- Dropdown to select task list -->
+  <label for="taskList">Select Task List:</label>
+  <select id="taskList" onchange="loadTasks()">
     <!-- Options will be dynamically added here -->
   </select>
 
-  <!-- Task Container -->
-  <div id="tasksContainer">
-    <!-- Tasks will be displayed here -->
-  </div>
+  <!-- Add an iframe to embed Google Tasks -->
+  <iframe id="tasksFrame" width="100%" height="600" src=""></iframe>
 
-  <script>
-    let gapiLoaded = false;
-    let tokenClient;
+  <script type="text/javascript">
+    let tasksEmbed;
+    let idToken;
 
-    // Callback after API and Sign-In libraries are loaded
-    function gapiLoaded() {
-      gapi.load('client:auth2', initializeGapiClient);
-    }
-
-    // Initialize the API client and Google Sign-In
-    async function initializeGapiClient() {
-      await gapi.client.init({
-        apiKey: API_KEY,
-        clientId: CLIENT_ID,
-        discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/tasks/v1/rest'],
-        scope: 'https://www.googleapis.com/auth/tasks.readonly',
-      });
-
-      // Initialize Google Identity Services
-      tokenClient = google.accounts.oauth2.initTokenClient({
-        client_id: CLIENT_ID,
-        scope: 'https://www.googleapis.com/auth/tasks.readonly',
-        callback: '', // Defined later
-      });
-
-      gapiLoaded = true;
-      maybeEnableButtons();
-    }
-
-    // Enable buttons after all libraries are loaded
-    function maybeEnableButtons() {
-      if (gapiLoaded) {
-        document.querySelector('.g-signin2').style.display = 'block';
-      }
-    }
-
-    // Sign in the user upon button click
+    /**
+     * Google Sign-In success callback.
+     */
     function onSignIn(googleUser) {
-      // Handle sign-in success, and then trigger your own authentication logic
-      // You can use googleUser.getAuthResponse().id_token to get the ID token for authentication
-      tokenClient.requestAccessToken({ prompt: 'get' })
-        .then(() => fetchTaskLists());
+      // Get user's ID token for authentication
+      idToken = googleUser.getAuthResponse().id_token;
+
+      // Initialize task lists
+      initializeTaskLists();
     }
 
-    // Fetch and display task lists
-    async function fetchTaskLists() {
-      const response = await gapi.client.tasks.tasklists.list();
-      const taskLists = response.result.items;
-
-      // Populate the dropdown with task lists
-      const taskListsDropdown = document.getElementById('taskLists');
-      taskListsDropdown.innerHTML = '';
-      taskLists.forEach(taskList => {
-        const option = document.createElement('option');
-        option.value = taskList.id;
-        option.text = taskList.title;
-        taskListsDropdown.appendChild(option);
-      });
-
-      // Fetch tasks for the selected task list
-      fetchTasks();
-    }
-
-    // Fetch and display tasks for the selected task list
-    async function fetchTasks() {
-      const selectedTaskListId = document.getElementById('taskLists').value;
-      const response = await gapi.client.tasks.tasks.list({
-        tasklist: selectedTaskListId,
-      });
-      const tasks = response.result.items;
-
-      // Display tasks in the tasksContainer
-      const tasksContainer = document.getElementById('tasksContainer');
-      tasksContainer.innerHTML = '';
-      if (tasks && tasks.length > 0) {
-        tasks.forEach(task => {
-          const taskItem = document.createElement('div');
-          taskItem.innerText = task.title;
-          tasksContainer.appendChild(taskItem);
+    /**
+     * Initialize task lists dropdown.
+     */
+    async function initializeTaskLists() {
+      try {
+        const response = await gapi.client.tasks.tasklists.list({
+          'maxResults': 10,
         });
-      } else {
-        tasksContainer.innerText = 'No tasks found.';
+
+        const taskLists = response.result.items;
+        const dropdown = document.getElementById('taskList');
+
+        // Populate dropdown with task lists
+        taskLists.forEach((taskList) => {
+          const option = document.createElement('option');
+          option.value = taskList.id;
+          option.text = taskList.title;
+          dropdown.appendChild(option);
+        });
+
+        // Load tasks for the default selected task list
+        loadTasks();
+      } catch (error) {
+        console.error('Error initializing task lists:', error);
       }
+    }
+
+    /**
+     * Load tasks based on the selected task list.
+     */
+    function loadTasks() {
+      const selectedTaskListId = document.getElementById('taskList').value;
+
+      // Update the iframe source with the Google Tasks embed URL
+      document.getElementById('tasksFrame').src = `https://tasks.google.com/embed/list/${selectedTaskListId}?origin=https://mail.google.com&idToken=${idToken}`;
     }
   </script>
 
-  <!-- Trigger loading of Google libraries -->
-  <script async defer src="https://apis.google.com/js/api.js?onload=gapiLoaded"></script>
+  <!-- Load Google API and Google Sign-In -->
+  <script async defer src="https://apis.google.com/js/api.js" onload="gapi.load('auth2', initGoogleSignIn)"></script>
+  <script async defer src="https://apis.google.com/js/platform.js" defer></script>
+
+  <script type="text/javascript">
+    /**
+     * Initialize Google Sign-In.
+     */
+    function initGoogleSignIn() {
+      gapi.load('auth2', function () {
+        gapi.auth2.init({
+          client_id: '469907870120-iecguv6bovdlicjaqtiq8044hl1mkl3j.apps.googleusercontent.com',
+        });
+      });
+    }
+  </script>
 </body>
 </html>
+
